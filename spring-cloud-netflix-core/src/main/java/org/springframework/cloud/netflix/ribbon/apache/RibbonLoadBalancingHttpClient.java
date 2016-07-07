@@ -23,12 +23,14 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.springframework.cloud.netflix.ribbon.ServerIntrospector;
 import org.springframework.cloud.netflix.ribbon.support.AbstractLoadBalancingClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.netflix.client.config.CommonClientConfigKey;
 import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.ILoadBalancer;
+import com.netflix.loadbalancer.Server;
 
 /**
  * @author Christian Lohmann
@@ -38,12 +40,23 @@ public class RibbonLoadBalancingHttpClient
 		AbstractLoadBalancingClient<RibbonApacheHttpRequest, RibbonApacheHttpResponse> {
 	private final HttpClient delegate = HttpClientBuilder.create().build();
 
+	private ServerIntrospector serverIntrospector;
+
 	public RibbonLoadBalancingHttpClient() {
 		super();
 	}
 
 	public RibbonLoadBalancingHttpClient(final ILoadBalancer lb) {
 		super(lb);
+	}
+
+	@Override
+	public URI reconstructURIWithServer(Server server, URI original) {
+		URI uri = original;
+		if(this.serverIntrospector.isSecure(server)){
+			uri = UriComponentsBuilder.fromUri(original).scheme("https").build().toUri();
+		}
+		return super.reconstructURIWithServer(server, uri);
 	}
 
 	@Override
@@ -75,6 +88,14 @@ public class RibbonLoadBalancingHttpClient
 		final HttpUriRequest httpUriRequest = request.toRequest(requestConfig);
 		final HttpResponse httpResponse = this.delegate.execute(httpUriRequest);
 		return new RibbonApacheHttpResponse(httpResponse, httpUriRequest.getURI());
+	}
+
+	public ServerIntrospector getServerIntrospector() {
+		return serverIntrospector;
+	}
+
+	public void setServerIntrospector(ServerIntrospector serverIntrospector) {
+		this.serverIntrospector = serverIntrospector;
 	}
 
 }
